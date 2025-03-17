@@ -1,15 +1,13 @@
 package com.example.googleAuth.controllers;
 
-import com.example.googleAuth.util.JwtUtil;
-import com.example.googleAuth.util.JwtStore;
+import com.example.googleAuth.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
-import java.util.Map;
+import io.jsonwebtoken.*;
+import java.util.*;
 
 @RestController
 public class TokenController {
@@ -48,26 +46,40 @@ public class TokenController {
     @PostMapping("/refresh-token")
     public ResponseEntity<Map<String, String>> refreshToken(@RequestHeader("Authorization") String authHeader) {
         Map<String, String> response = new HashMap<>();
-        // Extract token from "Bearer <token>"
-        String oldToken = authHeader;
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            oldToken = authHeader.substring(7);
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            response.put("error", "Invalid Authorization header format");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
+
+        String oldToken = authHeader.substring(7);
+        String username = null;
 
         try {
-            // Skip expiration check for refresh token
-            String username = jwtUtil.extractUsername(oldToken);
-            String newToken = jwtUtil.generateToken(username); // Generate a new token
-            response.put("token", newToken);
-            return ResponseEntity.ok(response);
+            // Try to extract username from token, ignoring expiration
+            username = jwtUtil.extractUsernameFromExpiredToken(oldToken);
+        } catch (JwtException e) {
+            // Token is malformed or tampered with
+            response.put("error", "Invalid token: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         } catch (Exception e) {
             response.put("error", "Token processing error: " + e.getMessage());
-            return ResponseEntity.status(401).body(response);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
-    }
 
+        if (username == null) {
+            response.put("error", "Could not extract username from token");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+
+        // Generate a new token with the username
+        String newToken = jwtUtil.generateToken(username);
+        response.put("token", newToken);
+        return ResponseEntity.ok(response);
+    }
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout(Authentication authentication) {
+
         Map<String, String> response = new HashMap<>();
 
         if (authentication != null) {

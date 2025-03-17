@@ -5,6 +5,9 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -18,8 +21,22 @@ public class JwtUtil {
 
     private final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
 
+    public Key getSecretKey() {
+        return SECRET_KEY;
+    }
+
     public String extractUsername(String token) throws ExpiredJwtException {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    // New method to extract username even from expired tokens
+    public String extractUsernameFromExpiredToken(String token) {
+        try {
+            return extractUsername(token);
+        } catch (ExpiredJwtException e) {
+            // If token is expired, get username from the JWT claims
+            return e.getClaims().getSubject();
+        }
     }
 
     public Date extractExpiration(String token) throws ExpiredJwtException {

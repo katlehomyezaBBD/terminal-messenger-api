@@ -23,8 +23,13 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        // Skip token validation for the refresh token endpoint
+        if (request.getRequestURI().equals("/refresh-token")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
 
         final String authorizationHeader = request.getHeader("Authorization");
 
